@@ -36,6 +36,7 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/register", h.RegisterUser).Methods("POST")
+	router.HandleFunc("/login", h.LoginUser).Methods("POST")
 
 	if err := http.ListenAndServe(":"+PORT, router); err != nil {
 		panic(err)
