@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/BHAV0207/user-service/internal/handler"
+	"github.com/BHAV0207/user-service/internal/middleware"
 	"github.com/BHAV0207/user-service/internal/repository"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -37,6 +38,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/register", h.RegisterUser).Methods("POST")
 	router.HandleFunc("/login", h.LoginUser).Methods("POST")
+	router.Handle("/me", middleware.JWTAuth(http.HandlerFunc(h.UserInfo))).Methods("GET")
 
 	if err := http.ListenAndServe(":"+PORT, router); err != nil {
 		panic(err)

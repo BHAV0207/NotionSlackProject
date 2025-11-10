@@ -10,12 +10,7 @@ import (
 	"github.com/BHAV0207/user-service/internal/service"
 	"github.com/BHAV0207/user-service/pkg/models"
 	"github.com/golang-jwt/jwt"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-type UserHandler struct {
-	DB *pgxpool.Pool
-}
 
 var jwtSecret = []byte("supersecretkey")
 
