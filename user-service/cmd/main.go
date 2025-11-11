@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/BHAV0207/user-service/internal/handler"
+	"github.com/BHAV0207/user-service/internal/kafka"
 	"github.com/BHAV0207/user-service/internal/middleware"
 	"github.com/BHAV0207/user-service/internal/repository"
 	"github.com/gorilla/mux"
@@ -28,11 +29,18 @@ func main() {
 		PORT = "8000"
 	}
 
+	broker := os.Getenv("KAFKA_BROKER")
+	if broker == "" {
+		broker = "kafka:9092"
+	}
+
 	client := repository.ConnectDb(URI)
 	defer client.Close()
 
+	userCreatedEvent := kafka.NewProducer(broker, "user-created")
 	h := &handler.UserHandler{
-		DB: client,
+		DB:       client,
+		Producer: userCreatedEvent,
 	}
 
 	router := mux.NewRouter()

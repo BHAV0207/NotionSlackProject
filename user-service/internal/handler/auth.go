@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -47,6 +48,17 @@ func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("DB Error: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	event := map[string]any{
+		"event_type": "user_created",
+		"name":       User.Name,
+		"email":      User.Email,
+		"phone":      User.Phone,
+		"timestamp":  time.Now().Format(time.RFC3339),
+	}
+	if err := h.Producer.Publish(event); err != nil {
+		log.Printf("⚠️ Failed to publish user-created event: %v", err)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -102,6 +114,15 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
+	}
+
+	event := map[string]any{
+		"event_type": "user_logged_in",
+		"email":      req.Email,
+		"timestamp":  time.Now().Format(time.RFC3339),
+	}
+	if err := h.Producer.Publish(event); err != nil {
+		log.Printf("⚠️ Failed to publish user-logged-in event: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
