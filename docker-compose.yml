@@ -43,7 +43,7 @@ services:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/register"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/register"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -156,26 +156,26 @@ services:
   #     retries: 3
   #     start_period: 40s
 
-  # notification-service:
-  #   build:
-  #     context: ./notification-service
-  #     dockerfile: Dockerfile
-  #   container_name: notification-service
-  #   ports:
-  #     - "2000:2000"
-  #   environment:
-  #     - PORT=2000
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - microservices-network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2000/notifications"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+    env_file:
+      - ./notification-service/.env
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/notifications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   microservices-network:

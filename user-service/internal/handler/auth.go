@@ -50,16 +50,18 @@ func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := map[string]any{
-		"event_type": "user_created",
-		"name":       User.Name,
-		"email":      User.Email,
-		"phone":      User.Phone,
-		"timestamp":  time.Now().Format(time.RFC3339),
-	}
-	if err := h.Producer.Publish(event); err != nil {
-		log.Printf("⚠️ Failed to publish user-created event: %v", err)
-	}
+	go func(u models.User) {
+		event := map[string]any{
+			"event_type": "user_created",
+			"name":       u.Name,
+			"email":      u.Email,
+			"phone":      u.Phone,
+			"timestamp":  time.Now().Format(time.RFC3339),
+		}
+		if err := h.Producer.Publish(event); err != nil {
+			log.Printf("⚠️ Kafka publish failed (user-created): %v", err)
+		}
+	}(User)
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
@@ -116,14 +118,16 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := map[string]any{
-		"event_type": "user_logged_in",
-		"email":      req.Email,
-		"timestamp":  time.Now().Format(time.RFC3339),
-	}
-	if err := h.Producer.Publish(event); err != nil {
-		log.Printf("⚠️ Failed to publish user-logged-in event: %v", err)
-	}
+	go func(email string) {
+		event := map[string]any{
+			"event_type": "user_logged_in",
+			"email":      email,
+			"timestamp":  time.Now().Format(time.RFC3339),
+		}
+		if err := h.Producer.Publish(event); err != nil {
+			log.Printf("⚠️ Kafka publish failed (user-logged-in): %v", err)
+		}
+	}(req.Email)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
