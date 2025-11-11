@@ -37,8 +37,9 @@ func (c *Consumer) StartConsuming() {
 		INSERT INTO notifications (user_id, type, message, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		`
-		_, err := c.DB.Exec(context.Background(), query,
+		_, err = c.Collection.Exec(context.Background(), query,
 			event.UserID, event.EventType, userMsg, "SENT", time.Now(), time.Now())
+
 		if err != nil {
 			fmt.Println("⚠️ Failed to insert notification:", err)
 		}
@@ -49,7 +50,7 @@ func (c *Consumer) StartConsuming() {
 // Helper for message content
 func buildMessage(event GenericEvent) string {
 	switch event.EventType {
-	case "user-creted":
+	case "user-created":
 		return fmt.Sprintf("👋 Welcome aboard, User %s!", event.UserID)
 	case "user-deleted":
 		return fmt.Sprintf("👋 Goodbye, User %s! We're sad to see you go.", event.UserID)

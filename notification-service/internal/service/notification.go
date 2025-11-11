@@ -15,7 +15,7 @@ type UserResponse struct {
 }
 
 func GetUserByID(userID string) (*UserResponse, error) {
-	url := fmt.Sprintf("http://user-service:8000/me/%s", userID)
+	url := fmt.Sprintf("http://user-service:8000/%s", userID)
 	// Make HTTP GET request to user service (omitted for brevity)
 	client := &http.Client{Timeout: 10 * time.Second}
 

@@ -46,6 +46,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/register", h.RegisterUser).Methods("POST")
 	router.HandleFunc("/login", h.LoginUser).Methods("POST")
+	router.HandleFunc("/{id}", h.GetUserByID).Methods("GET")
 	router.Handle("/me", middleware.JWTAuth(http.HandlerFunc(h.UserInfo))).Methods("GET")
 
 	if err := http.ListenAndServe(":"+PORT, router); err != nil {

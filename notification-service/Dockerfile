@@ -20,15 +20,17 @@ RUN apk --no-cache add ca-certificates wget
 RUN addgroup -g 1001 -S appgroup \
   && adduser -u 1001 -S appuser -G appgroup
 
-WORKDIR /root/
+WORKDIR /app
 
 COPY --from=builder /app/main .
 
-RUN chown -R appuser:appgroup /root/
+# ✅ make sure it's executable and owned by our non-root user
+RUN chmod +x ./main && chown -R appuser:appgroup /app
+
 USER appuser
 
 EXPOSE 9000
-
 CMD ["./main"]
+
 
 
