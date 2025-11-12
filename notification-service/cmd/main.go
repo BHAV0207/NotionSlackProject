@@ -42,9 +42,20 @@ func main() {
 		"notification-service",
 		client,
 	)
+	
+	userLoginConsumer := event.NewConsumer(
+		broker,
+		"user-logged-in", // ✅ FIXED topic name
+		"notif-login-group", // ✅ unique group ID
+		"notification-service",
+		client,
+	)
+	
+	go userLoginConsumer.StartConsuming()
+	go userConsumer.StartConsuming()
+	
 
-	// Run both consumers concurrently
-	// go orderConsumer.StartConsuming()
+	go userLoginConsumer.StartConsuming()
 	go userConsumer.StartConsuming()
 
 	server := &http.Server{

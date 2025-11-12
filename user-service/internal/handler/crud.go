@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/BHAV0207/user-service/internal/middleware"
 	"github.com/BHAV0207/user-service/pkg/models"
+	"github.com/BHAV0207/user-service/pkg/redis"
 	"github.com/gorilla/mux"
+
 	"github.com/jackc/pgx"
 )
 
@@ -55,10 +58,21 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user:%s", userID)
+	cachedData, err := redis.Client.Get(redis.Ctx, cacheKey).Result()
+	if err == nil && cachedData != "" {
+		var cachedUser models.User
+		if err := json.Unmarshal([]byte(cachedData), &cachedUser); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(cachedUser)
+			return
+		}
+	}
+
 	// Query user from DB
 	var user models.User
 	query := `SELECT id, name, email, phone FROM users WHERE id = $1`
-	err := h.DB.QueryRow(ctx, query, userID).Scan(&user.ID, &user.Name, &user.Email, &user.Phone)
+	err = h.DB.QueryRow(ctx, query, userID).Scan(&user.ID, &user.Name, &user.Email, &user.Phone)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) { // ✅ no record found
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -67,6 +81,9 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	data, _ := json.Marshal(user)
+	redis.Client.Set(redis.Ctx, cacheKey, data, time.Hour)
 
 	// Respond with JSON
 	w.Header().Set("Content-Type", "application/json")

@@ -10,6 +10,7 @@ import (
 
 	"github.com/BHAV0207/user-service/internal/service"
 	"github.com/BHAV0207/user-service/pkg/models"
+	"github.com/BHAV0207/user-service/pkg/redis"
 	"github.com/golang-jwt/jwt"
 )
 
@@ -54,6 +55,10 @@ func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userKey := fmt.Sprintf("user:%s", User.ID)
+	userJSON, _ := json.Marshal(User)
+	redis.Client.Set(redis.Ctx, userKey, userJSON, time.Hour)
+
 	go func(u models.User) {
 		type userEvent struct {
 			EventType string `json:"eventType"`
@@ -97,6 +102,25 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rateKey := "login_attempts:" + req.Email
+	attempts, err := redis.Client.Incr(redis.Ctx, rateKey).Result()
+	if err != nil {
+		http.Error(w, "Redis error", http.StatusInternalServerError)
+		return
+	}
+
+	if attempts == 1 {
+		// first attempt → set TTL window (5 minutes)
+		redis.Client.Expire(redis.Ctx, rateKey, 5*time.Minute)
+	}
+
+	if attempts > 5 {
+		ttl, _ := redis.Client.TTL(redis.Ctx, rateKey).Result()
+		msg := fmt.Sprintf("Too many login attempts. Try again in %.0f seconds.", ttl.Seconds())
+		http.Error(w, msg, http.StatusTooManyRequests)
+		return
+	}
+
 	exists := service.FindUserEmail(ctx, h.DB, req.Email)
 	if !exists {
 		http.Error(w, "User does not exist", http.StatusNotFound)
@@ -105,7 +129,7 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	var HashedPassword string
 	query := `SELECT password FROM users WHERE email = $1`
-	err := h.DB.QueryRow(ctx, query, req.Email).Scan(&HashedPassword)
+	err = h.DB.QueryRow(ctx, query, req.Email).Scan(&HashedPassword)
 	if err != nil {
 		http.Error(w, "Error fetching user data", http.StatusInternalServerError)
 		return

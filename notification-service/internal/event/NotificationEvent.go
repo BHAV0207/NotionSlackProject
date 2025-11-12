@@ -30,7 +30,7 @@ func (c *Consumer) StartConsuming() {
 
 		// Build notification message
 		userMsg := buildMessage(event)
-		c.sendNotification(event.UserID, userMsg)
+		c.sendNotification(event, userMsg)
 
 		// Store notification in DB
 		query := `
@@ -56,32 +56,72 @@ func buildMessage(event GenericEvent) string {
 			display = event.UserID
 		}
 		return fmt.Sprintf("👋 Welcome aboard, %s!", display)
-	case "user-deleted":
-		return fmt.Sprintf("👋 Goodbye, User %s! We're sad to see you go.", event.UserID)
-	case "order-created":
-		return fmt.Sprintf("✅ Order #%s placed successfully!", event.OrderID)
+
+	case "user-logged-in": // ✅ fixed name
+		display := event.Name
+		if display == "" {
+			display = event.UserID
+		}
+		if display == "" {
+			display = event.Email
+		}
+		if display == "" {
+			display = "there"
+		}
+		return fmt.Sprintf("👋 Welcome back, %s!", display)
+
 	case "payment-success":
 		return fmt.Sprintf("💰 Payment for order #%s succeeded!", event.OrderID)
+
 	case "payment-failed":
 		return fmt.Sprintf("⚠️ Payment for order #%s failed. Please retry.", event.OrderID)
+
 	default:
 		return fmt.Sprintf("🔔 Update on your order #%s", event.OrderID)
 	}
 }
-func (c *Consumer) sendNotification(userID, message string) {
-	user, err := service.GetUserByID(userID)
-	if err != nil {
-		fmt.Printf("❌ Failed to fetch user %s: %v\n", userID, err)
+
+func (c *Consumer) sendNotification(event GenericEvent, message string) {
+	var (
+		user *service.UserResponse
+		err  error
+	)
+
+	if event.UserID != "" {
+		user, err = service.GetUserByID(event.UserID)
+		if err != nil {
+			fmt.Printf("❌ Failed to fetch user %s: %v\n", event.UserID, err)
+		}
+	}
+
+	email := event.Email
+	name := event.Name
+
+	if user != nil {
+		if email == "" {
+			email = user.Email
+		}
+		if name == "" {
+			name = user.Name
+		}
+	}
+
+	if email == "" {
+		fmt.Printf("⚠️ Skipping notification: no email available for event %+v\n", event)
 		return
+	}
+
+	if name == "" {
+		name = "there"
 	}
 
 	subject := "Notification from E-com Website"
-	body := fmt.Sprintf("Hey %s,<br><br>%s<br><br>– Team E-com", user.Name, message)
+	body := fmt.Sprintf("Hey %s,<br><br>%s<br><br>– Team E-com", name, message)
 
-	if err := handler.SendEmail(user.Email, subject, body); err != nil {
-		fmt.Printf("❌ Failed to send email to %s: %v\n", user.Email, err)
+	if err := handler.SendEmail(email, subject, body); err != nil {
+		fmt.Printf("❌ Failed to send email to %s: %v\n", email, err)
 		return
 	}
 
-	fmt.Printf("✅ Notification email sent to %s\n", user.Email)
+	fmt.Printf("✅ Notification email sent to %s\n", email)
 }

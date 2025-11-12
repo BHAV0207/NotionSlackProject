@@ -9,6 +9,7 @@ import (
 	"github.com/BHAV0207/user-service/internal/kafka"
 	"github.com/BHAV0207/user-service/internal/middleware"
 	"github.com/BHAV0207/user-service/internal/repository"
+	"github.com/BHAV0207/user-service/pkg/redis"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -36,6 +37,9 @@ func main() {
 
 	client := repository.ConnectDb(URI)
 	defer client.Close()
+
+	redis.InitRedis()
+	// start HTTP server or consumer
 
 	userCreatedEvent := kafka.NewProducer(broker, "user-created")
 	h := &handler.UserHandler{
