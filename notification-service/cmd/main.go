@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func main() {
 	}
 	PORT := os.Getenv("PORT")
 	if PORT == "" {
-		PORT = "9000"
+		PORT = "2000"
 	}
 
 	broker := os.Getenv("KAFKA_BROKER")

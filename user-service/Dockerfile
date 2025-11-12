@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24.1-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -22,21 +22,22 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.g
 # Final stage
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and wget for HTTPS requests and healthchecks
+RUN apk --no-cache add ca-certificates wget
 
 # Create a non-root user
 RUN addgroup -g 1001 -S appgroup && \
   adduser -u 1001 -S appuser -G appgroup
 
 # Set working directory
-WORKDIR /root/
+WORKDIR /app
 
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
-# Change ownership to non-root user
-RUN chown -R appuser:appgroup /root/
+# Change ownership and add execute permission
+RUN chown -R appuser:appgroup /app && \
+  chmod +x /app/main
 
 # Switch to non-root user
 USER appuser
@@ -46,7 +47,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/register || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8000/register || exit 1
 
 # Run the application
 CMD ["./main"]

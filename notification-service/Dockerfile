@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24.1-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -24,13 +24,13 @@ WORKDIR /app
 
 COPY --from=builder /app/main .
 
-# ✅ make sure it's executable and owned by our non-root user
-RUN chmod +x ./main && chown -R appuser:appgroup /app
+RUN chown -R appuser:appgroup /app && \
+  chmod +x /app/main
 
 USER appuser
 
-EXPOSE 9000
-CMD ["./main"]
+EXPOSE 2000
 
+CMD ["./main"]
 
 

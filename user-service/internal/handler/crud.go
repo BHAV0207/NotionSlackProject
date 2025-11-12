@@ -57,8 +57,8 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 
 	// Query user from DB
 	var user models.User
-	query := `SELECT name, email, phone FROM users WHERE id = $1`
-	err := h.DB.QueryRow(ctx, query, userID).Scan(&user.Name, &user.Email, &user.Phone)
+	query := `SELECT id, name, email, phone FROM users WHERE id = $1`
+	err := h.DB.QueryRow(ctx, query, userID).Scan(&user.ID, &user.Name, &user.Email, &user.Phone)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) { // ✅ no record found
 			http.Error(w, "User not found", http.StatusNotFound)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   zookeeper:
@@ -162,16 +160,16 @@ services:
       dockerfile: Dockerfile
     container_name: notification-service
     ports:
-      - "9000:9000"
+      - "2000:2000"
     environment:
-      - PORT=9000
+      - PORT=2000
     env_file:
       - ./notification-service/.env
     networks:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/notifications"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2000/notifications"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -51,7 +51,11 @@ func (c *Consumer) StartConsuming() {
 func buildMessage(event GenericEvent) string {
 	switch event.EventType {
 	case "user-created":
-		return fmt.Sprintf("👋 Welcome aboard, User %s!", event.UserID)
+		display := event.Name
+		if display == "" {
+			display = event.UserID
+		}
+		return fmt.Sprintf("👋 Welcome aboard, %s!", display)
 	case "user-deleted":
 		return fmt.Sprintf("👋 Goodbye, User %s! We're sad to see you go.", event.UserID)
 	case "order-created":

@@ -33,6 +33,10 @@ func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now()
+	User.CreatedAt = now
+	User.UpdatedAt = now
+
 	//  hash password
 	hashedPassword, err := service.HashPassword(User.Password)
 	if err != nil {
@@ -43,20 +47,29 @@ func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	//  store user in db
 	query := `INSERT INTO users (name, email, phone, password, created_at, updated_at)
-			  VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err = h.DB.Exec(ctx, query, User.Name, User.Email, User.Phone, User.Password, User.CreatedAt, User.UpdatedAt)
-	if err != nil {
+			  VALUES ($1, $2, $3, $4, $5, $6)
+			  RETURNING id`
+	if err := h.DB.QueryRow(ctx, query, User.Name, User.Email, User.Phone, User.Password, User.CreatedAt, User.UpdatedAt).Scan(&User.ID); err != nil {
 		http.Error(w, fmt.Sprintf("DB Error: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	go func(u models.User) {
-		event := map[string]any{
-			"event_type": "user_created",
-			"name":       u.Name,
-			"email":      u.Email,
-			"phone":      u.Phone,
-			"timestamp":  time.Now().Format(time.RFC3339),
+		type userEvent struct {
+			EventType string `json:"eventType"`
+			UserID    string `json:"userId"`
+			Name      string `json:"name"`
+			Email     string `json:"email"`
+			Phone     string `json:"phone"`
+			Timestamp string `json:"timestamp"`
+		}
+		event := userEvent{
+			EventType: "user-created",
+			UserID:    u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Phone:     u.Phone,
+			Timestamp: time.Now().Format(time.RFC3339),
 		}
 		if err := h.Producer.Publish(event); err != nil {
 			log.Printf("⚠️ Kafka publish failed (user-created): %v", err)
@@ -119,10 +132,15 @@ func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func(email string) {
-		event := map[string]any{
-			"event_type": "user_logged_in",
-			"email":      email,
-			"timestamp":  time.Now().Format(time.RFC3339),
+		type userEvent struct {
+			EventType string `json:"eventType"`
+			Email     string `json:"email"`
+			Timestamp string `json:"timestamp"`
+		}
+		event := userEvent{
+			EventType: "user-logged-in",
+			Email:     email,
+			Timestamp: time.Now().Format(time.RFC3339),
 		}
 		if err := h.Producer.Publish(event); err != nil {
 			log.Printf("⚠️ Kafka publish failed (user-logged-in): %v", err)

@@ -8,10 +8,10 @@ import (
 )
 
 type UserResponse struct {
-	ID    string `json:"_id"`
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
-	Phone int    `json:"phone"`
+	Phone string `json:"phone"`
 }
 
 func GetUserByID(userID string) (*UserResponse, error) {
