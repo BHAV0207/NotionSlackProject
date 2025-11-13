@@ -13,6 +13,9 @@ import (
 func (c *Consumer) StartConsuming() {
 	fmt.Printf("📩 [%s] Kafka consumer started on topic: %s\n", c.ServiceName, c.Kafka.Reader.Config().Topic)
 
+	brokerURL := c.Kafka.Reader.Config().Brokers[0]
+	dlqTopic := c.Kafka.Reader.Config().Topic + "-dlq"
+
 	for {
 		msg, err := c.Kafka.Reader.ReadMessage(context.Background())
 		if err != nil {
@@ -23,28 +26,49 @@ func (c *Consumer) StartConsuming() {
 		var event GenericEvent
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
 			fmt.Println("⚠️ Invalid Kafka event:", err)
+			SendToDlq(brokerURL, dlqTopic, msg.Value)
 			continue
 		}
 
-		fmt.Printf("📬 [%s] Received: %+v\n", c.ServiceName, event)
-
-		// Build notification message
-		userMsg := buildMessage(event)
-		c.sendNotification(event, userMsg)
-
-		// Store notification in DB
-		query := `
-		INSERT INTO notifications (user_id, type, message, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		`
-		_, err = c.Collection.Exec(context.Background(), query,
-			event.UserID, event.EventType, userMsg, "SENT", time.Now(), time.Now())
-
-		if err != nil {
-			fmt.Println("⚠️ Failed to insert notification:", err)
+		// Retry logic
+		const maxRetries = 3
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			err = c.ProcessEvent(event)
+			if err == nil {
+				break // ✅ Success
+			}
+			fmt.Printf("⚠️ Attempt %d/%d failed for event %+v: %v\n", attempt, maxRetries, event, err)
+			time.Sleep(2 * time.Second)
 		}
 
+		if err != nil {
+			fmt.Printf("💀 Event failed after %d attempts, sending to DLQ...\n", maxRetries)
+			SendToDlq(brokerURL, dlqTopic, event)
+		}
 	}
+}
+
+func (c *Consumer) ProcessEvent(event GenericEvent) error {
+	userMsg := buildMessage(event)
+	if userMsg == "" {
+		return fmt.Errorf("empty notification message for event: %+v", event)
+	}
+
+	// Try sending notification
+	c.TrySendNotification(event, userMsg)
+
+	// Store notification in DB
+	query := `
+		INSERT INTO notifications (user_id, type, message, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := c.Collection.Exec(context.Background(), query,
+		event.UserID, event.EventType, userMsg, "SENT", time.Now(), time.Now())
+
+	if err != nil {
+		return fmt.Errorf("DB insert failed: %v", err)
+	}
+	return nil
 }
 
 // Helper for message content
@@ -79,6 +103,17 @@ func buildMessage(event GenericEvent) string {
 	default:
 		return fmt.Sprintf("🔔 Update on your order #%s", event.OrderID)
 	}
+}
+
+func (c *Consumer) TrySendNotification(event GenericEvent, message string) error {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("💥 Panic recovered in sendNotification: %v\n", r)
+		}
+	}()
+
+	c.sendNotification(event, message)
+	return nil
 }
 
 func (c *Consumer) sendNotification(event GenericEvent, message string) {
