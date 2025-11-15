@@ -1,7 +1,8 @@
-package repository
+package db
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -9,19 +10,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var Client *mongo.Client
-var MessageCollection *mongo.Collection
+func ConnectMongo(uri string) *mongo.Client {
+	clientOpts := options.Client().ApplyURI(uri)
 
-func ConnectDb(uri string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		log.Fatalf("❌ Mongo connect failed: %v", err)
+		log.Fatal("❌ Mongo connection error:", err)
 	}
-	Client = client
-	MessageCollection = client.Database("chat").Collection("messages")
-	log.Println("✅ MongoDB connected")
 
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatal("❌ Mongo ping failed:", err)
+	}
+
+	fmt.Println("✅ Connected to MongoDB Atlas!")
+	return client
 }

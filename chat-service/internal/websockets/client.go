@@ -1,10 +1,14 @@
 package websockets
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"time"
 
+	"github.com/BHAV0207/chat-service/pkg/models"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -20,7 +24,7 @@ type Client struct {
 	Send chan []byte
 }
 
-func (c *Client) ReadPump() {
+func (c *Client) ReadPump(dbClient *mongo.Client) {
 	defer func() {
 		c.Hub.Unregister <- c
 		c.Conn.Close()
@@ -33,13 +37,35 @@ func (c *Client) ReadPump() {
 		return nil
 	})
 
+	collection := dbClient.Database("chatdb").Collection("messages")
+
 	for {
-		_, message, err := c.Conn.ReadMessage()
+		_, msg, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Println("read error:", err)
 			break
 		}
-		c.Hub.Broadcast <- message
+
+		var message models.Message
+		if err := json.Unmarshal(msg, &message); err != nil {
+			log.Println("Invalid message format:", err)
+			continue
+		}
+
+		message.Timestamp = time.Now()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err = collection.InsertOne(ctx, message)
+		cancel()
+
+		if err != nil {
+			log.Println("DB insert error:", err)
+			continue
+		}
+
+		// Broadcast to other clients
+		c.Hub.Broadcast <- msg
+
 	}
 }
 
