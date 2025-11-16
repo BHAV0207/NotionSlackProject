@@ -1,45 +1,29 @@
 package websockets
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type Hub struct {
-	Clients    map[*Client]bool
-	Broadcast  chan []byte
-	Register   chan *Client
-	Unregister chan *Client
+	Rooms map[string]*Room
+	mu    sync.RWMutex
 }
 
 func NewHub() *Hub {
-	return &Hub{
-		Clients:    make(map[*Client]bool),
-		Broadcast:  make(chan []byte),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
-	}
+	return &Hub{Rooms: make(map[string]*Room)}
 }
 
-func (h *Hub) Run() {
-	for {
-		select {
-		case client := <-h.Register:
-			h.Clients[client] = true
-			fmt.Println("✅ Client connected. Total:", len(h.Clients))
+func (h *Hub) GetRoom(name string) *Room {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-		case client := <-h.Unregister:
-			if _, ok := h.Clients[client]; ok {
-				delete(h.Clients, client)
-				close(client.Send)
-				fmt.Println("❌ Client disconnected. Total:", len(h.Clients))
-			}
-		case message := <-h.Broadcast:
-			for client := range h.Clients {
-				select {
-				case client.Send <- message:
-				default:
-					close(client.Send)
-					delete(h.Clients, client)
-				}
-			}
-		}
+	room, exists := h.Rooms[name]
+	if !exists {
+		room = NewRoom(name)
+		h.Rooms[name] = room
+		go room.Run()
+		fmt.Println("🏠 Created new room:", name)
 	}
+	return room
 }

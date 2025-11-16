@@ -19,14 +19,18 @@ const (
 )
 
 type Client struct {
-	Hub  *Hub
-	Conn *websocket.Conn
-	Send chan []byte
+	ID     string
+	Conn   *websocket.Conn
+	Send   chan []byte
+	Hub    *Hub
+	Room   string
+	Broker *RedisBroker
+	DB     *mongo.Client // <--- add Mongo client here
 }
 
-func (c *Client) ReadPump(dbClient *mongo.Client) {
+func (c *Client) ReadPump() {
 	defer func() {
-		c.Hub.Unregister <- c
+		c.Hub.GetRoom(c.Room).Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -37,35 +41,59 @@ func (c *Client) ReadPump(dbClient *mongo.Client) {
 		return nil
 	})
 
-	collection := dbClient.Database("chatdb").Collection("messages")
+	if c.DB == nil {
+		log.Println("DB client is nil")
+		return
+	}
+	if c.Broker == nil {
+		log.Println("Broker is nil")
+		return
+	}
+
+	collection := c.DB.Database("chatdb").Collection("messages")
 
 	for {
-		_, msg, err := c.Conn.ReadMessage()
+		_, msgBytes, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Println("read error:", err)
 			break
 		}
 
-		var message models.Message
-		if err := json.Unmarshal(msg, &message); err != nil {
-			log.Println("Invalid message format:", err)
+		// 1) Parse incoming JSON into Message
+		var m models.Message
+		if err := json.Unmarshal(msgBytes, &m); err != nil {
+			log.Println("invalid message format:", err)
 			continue
 		}
 
-		message.Timestamp = time.Now()
+		// Ensure required fields
+		if m.RoomID == "" {
+			m.RoomID = c.Room // fallback to the client's room
+		}
+		if m.Timestamp.IsZero() {
+			m.Timestamp = time.Now().UTC()
+		}
+		// If you have authentication, set SenderID from auth, not client-sent field:
+		// m.SenderID = c.UserID
 
+		// 2) Persist to Mongo (originating instance only)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_, err = collection.InsertOne(ctx, message)
+		_, insertErr := collection.InsertOne(ctx, m)
 		cancel()
-
-		if err != nil {
-			log.Println("DB insert error:", err)
-			continue
+		if insertErr != nil {
+			log.Println("mongo insert error:", insertErr)
+			// Continue: we can still publish even if DB write failed, or choose to skip publish.
 		}
 
-		// Broadcast to other clients
-		c.Hub.Broadcast <- msg
+		// 3) Publish to Redis so other instances receive it
+		// Ensure message payload is JSON string
+		payload, _ := json.Marshal(m)
+		c.Broker.Publish(m.RoomID, payload)
 
+		// Optionally also broadcast locally immediately (can skip since Redis subscription will deliver
+		// back to this instance if you subscribe to room channel). But to reduce latency you may want both:
+		room := c.Hub.GetRoom(m.RoomID)
+		room.Broadcast <- payload
 	}
 }
 

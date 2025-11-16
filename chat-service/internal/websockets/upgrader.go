@@ -8,7 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// Upgrader used to upgrade HTTP to WebSocket. Allow all origins for now (dev only).
 var Upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -17,7 +16,13 @@ var Upgrader = websocket.Upgrader{
 	},
 }
 
-func ServeWS(hub *Hub, dbClient *mongo.Client, w http.ResponseWriter, r *http.Request) {
+// note: pass both broker and dbClient
+func ServeWS(hub *Hub, broker *RedisBroker, dbClient *mongo.Client, w http.ResponseWriter, r *http.Request) {
+	roomName := r.URL.Query().Get("room")
+	if roomName == "" {
+		roomName = "general"
+	}
+
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
@@ -25,12 +30,23 @@ func ServeWS(hub *Hub, dbClient *mongo.Client, w http.ResponseWriter, r *http.Re
 	}
 
 	client := &Client{
-		Hub:  hub,
-		Conn: conn,
-		Send: make(chan []byte, 256),
+		ID:     r.RemoteAddr,
+		Conn:   conn,
+		Send:   make(chan []byte, 256),
+		Hub:    hub,
+		Room:   roomName,
+		Broker: broker,
+		DB:     dbClient, // <--- set DB client
 	}
-	hub.Register <- client
+
+	room := hub.GetRoom(roomName)
+	room.Register <- client
+
+	// subscribe once per room (subscribe is idempotent because hub.GetRoom creates room only once)
+	if broker != nil {
+		broker.Subscribe(roomName, hub)
+	}
 
 	go client.WritePump()
-	go client.ReadPump(dbClient)
+	go client.ReadPump() // no args now
 }
