@@ -18,17 +18,21 @@ var (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("fatal")
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("⚠️ .env not found — using environment variables")
 	}
 
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {
-		log.Fatal("MONGO_URI not set")
+		fmt.Println("⚠️ MONGO_URI not set (skipping Mongo connection)")
 	}
 
-	client = db.ConnectMongo(uri) // import internal/db package
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	client = db.ConnectMongo(uri)
 
 	// init history route so /history is registered
 	initHistoryRoutes(client)
@@ -36,8 +40,9 @@ func main() {
 	// create redis broker (use env or defaults)
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		redisAddr = "localhost:6379"
+		redisAddr = "redis:6379"
 	}
+
 	redisPass := os.Getenv("REDIS_PASS") // optional
 	broker := websockets.NewRedisBroker(redisAddr, redisPass)
 
@@ -45,6 +50,6 @@ func main() {
 		websockets.ServeWS(hub, broker, client, w, r) // pass both broker and db client
 	})
 
-	fmt.Println("🚀 Chat server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Printf("🚀 Chat server running on %s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
