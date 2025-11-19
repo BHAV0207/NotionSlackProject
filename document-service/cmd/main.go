@@ -34,7 +34,9 @@ func main() {
 		websockets.ServerWs(hub, w, r, DocID)
 	})
 
-	if err := http.ListenAndServe(PORT, r); err != nil {
+	log.Println("📄 Document Collaboration Service running on", PORT)
+
+	if err := http.ListenAndServe(":"+PORT, r); err != nil {
 		log.Fatal("Server Error:", err)
 	}
 
