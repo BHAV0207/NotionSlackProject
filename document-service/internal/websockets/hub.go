@@ -1,6 +1,10 @@
 package websockets
 
-import "github.com/gorilla/websocket"
+import (
+	"log"
+
+	"github.com/gorilla/websocket"
+)
 
 type Hub struct {
 	rooms      map[string]*Room
@@ -31,14 +35,18 @@ func (h *Hub) Run() {
 				h.rooms[client.DocID] = room
 			}
 			room.Clients[client] = true
+			log.Printf("Client registered for document %s. Total clients: %d", client.DocID, len(room.Clients))
 
 		case client := <-h.unregister:
 			room, ok := h.rooms[client.DocID]
 			if ok {
 				delete(room.Clients, client)
-			}
-			if len(room.Clients) == 0 {
-				delete(h.rooms, client.DocID)
+				if len(room.Clients) == 0 {
+					delete(h.rooms, client.DocID)
+					log.Printf("Room for document %s deleted (no clients)", client.DocID)
+				} else {
+					log.Printf("Client unregistered from document %s. Remaining clients: %d", client.DocID, len(room.Clients))
+				}
 			}
 
 		case msg := <-h.broadcast:
@@ -53,6 +61,7 @@ func (h *Hub) Run() {
 
 				err := client.Conn.WriteMessage(websocket.BinaryMessage, msg.Data)
 				if err != nil {
+					log.Printf("Error broadcasting to client in document %s: %v", msg.DocumentID, err)
 					h.unregister <- client
 				}
 			}

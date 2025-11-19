@@ -1,6 +1,10 @@
 package websockets
 
-import "github.com/gorilla/websocket"
+import (
+	"log"
+
+	"github.com/gorilla/websocket"
+)
 
 type Client struct {
 	Hub   *Hub
@@ -10,21 +14,30 @@ type Client struct {
 
 func (c *Client) ReadPump() {
 	defer func() {
+		log.Printf("Client disconnected from document: %s", c.DocID)
 		c.Hub.unregister <- c
 		c.Conn.Close()
 	}()
 
 	for {
-		_, data, err := c.Conn.ReadMessage()
+		messageType, data, err := c.Conn.ReadMessage()
 		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket error for document %s: %v", c.DocID, err)
+			}
 			break
 		}
 
-		// Broadcast CRDT update to others
-		c.Hub.broadcast <- Message{
-			DocumentID: c.DocID,
-			Data:       data,
-			Sender:     c,
+		// Only process binary messages (Yjs updates)
+		if messageType == websocket.BinaryMessage {
+			// Broadcast CRDT update to others
+			c.Hub.broadcast <- Message{
+				DocumentID: c.DocID,
+				Data:       data,
+				Sender:     c,
+			}
+		} else {
+			log.Printf("Received non-binary message type %d for document %s, ignoring", messageType, c.DocID)
 		}
 	}
 }
