@@ -6,15 +6,25 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/BHAV0207/documet-service/internal/handler"
 	"github.com/BHAV0207/documet-service/internal/websockets"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
 func main() {
+
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Printf("no env found")
+	}
+
+	// 1) Initialize DB
+	db.Init() // this populates db.DB
+	// get the gorm DB instance for handler
+	d := db.DB
+	if d == nil {
+		log.Fatal("database not initialized")
 	}
 
 	PORT := os.Getenv("PORT")
@@ -25,14 +35,27 @@ func main() {
 	hub := websockets.NewHub()
 	go hub.Run()
 
+	// 3) Create Handler (DI container)
+	h := handler.NewHandler(d, hub)
+
 	r := mux.NewRouter()
 
-	r.HandleFunc("/ws/document/{id}", func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		DocID := vars["id"]
+	r.HandleFunc("/documents", h.CreateDocument).Methods("POST")
+	r.HandleFunc("/documents/{id}", h.GetDocument).Methods("GET")
 
-		websockets.ServerWs(hub, w, r, DocID)
-	})
+	// Snapshots
+	r.HandleFunc("/documents/{id}/snapshot", h.UploadSnapshot).Methods("POST")
+	r.HandleFunc("/documents/{id}/snapshot", h.GetLatestSnapshot).Methods("GET")
+
+	// WebSocket route -> now uses Handler.ServeWS
+	r.HandleFunc("/ws/document/{id}", h.ServeWS)
+
+	// r.HandleFunc("/ws/document/{id}", func(w http.ResponseWriter, r *http.Request) {
+	// 	vars := mux.Vars(r)
+	// 	DocID := vars["id"]
+
+	// 	h.ServeWS(w, r, DocID)
+	// })
 
 	log.Println("📄 Document Collaboration Service running on", PORT)
 

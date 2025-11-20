@@ -1,0 +1,58 @@
+Visualization: Collaborative Editor System
+1. Basic Visual Model
+Actors (Who’s involved):
+Your Browser / Tab (where you see and type into the editor)
+
+Other Users’ Browsers (they run the same code, in their tabs)
+
+The Server (a “mailman” for WebSocket messages)
+
+Core Components
+text
+[ You typing ]         [ Yjs Doc ]         [ WebSocket ]        [ Server ]      [ Other User ]
+      │                   │                    │                   │                │
+      ▼                   ▼                    ▼                   ▼                ▼
+   [ TipTap Editor ]<-> [ Y.Doc ] <-> { WebSocket } <-> [ Server ] <-> { WebSocket } <-> [ TipTap Editor ]
+2. Step-by-Step Flow
+A. You Type in TipTap
+When you type or format text (bold, italic, etc), TipTap dispatches changes to the local editor state.
+
+B. Changes Stored in Yjs Document
+Y.Doc acts like a live document in your browser.
+
+When the editor changes, Yjs records the update in its memory.
+
+C. Yjs Document Emits Update
+Yjs detects the change and prepares a “binary update blob” (think: a little zipped up package telling what changed).
+
+D. WebSocket Sends Updates
+The binary blob is sent over a WebSocket connection to the server. WebSocket is a special protocol that keeps a door open for constant back-and-forth talk with the server, so everyone in the same document stays in sync.
+
+E. Server Broadcasts Update
+The server receives the blob and quickly forwards it to all other users currently viewing that same document.
+
+F. Other Users Receive Update
+Each other tab (other user’s browsers) receive the update via their own WebSocket.
+
+Yjs applies those changes to their local document, so everyone’s content stays in sync — even if people type at the same time.
+
+G. UI Updates Instantly
+TipTap sees the new changes and re-renders the editor content, so you see other users’ changes “live.”
+
+Block Diagram (Textual)
+Here’s another way of viewing it as a network:
+
+text
+          ┌───────────────────────────────┐
+          │            Server             │
+          └───────▲────────┬──────────────┘
+                  │        │
+            ┌─────┘        └─────┐
+      ┌─────────┐       ┌─────────┐
+      │Browser A│       │Browser B│
+      └────▲────┘       └────▲────┘
+           │                 │
+        [Y.Doc]————[WebSocket] (each browser)
+           │                 │
+       [TipTap Editor]   [TipTap Editor]
+Arrows: show updates traveling back and forth.

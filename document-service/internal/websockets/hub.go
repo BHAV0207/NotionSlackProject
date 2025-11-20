@@ -7,50 +7,50 @@ import (
 )
 
 type Hub struct {
-	rooms      map[string]*Room
-	register   chan *Client
-	unregister chan *Client
-	broadcast  chan Message
+	Rooms      map[string]*Room
+	Register   chan *Client
+	Unregister chan *Client
+	Broadcast  chan Message
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		rooms:      make(map[string]*Room),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan Message),
+		Rooms:      make(map[string]*Room),
+		Register:   make(chan *Client),
+		Unregister: make(chan *Client),
+		Broadcast:  make(chan Message),
 	}
 }
 
 func (h *Hub) Run() {
 	for {
 		select {
-		case client := <-h.register:
-			room, ok := h.rooms[client.DocID]
+		case client := <-h.Register:
+			room, ok := h.Rooms[client.DocID]
 			if !ok {
 				room = &Room{
 					ID:      client.DocID,
 					Clients: make(map[*Client]bool),
 				}
-				h.rooms[client.DocID] = room
+				h.Rooms[client.DocID] = room
 			}
 			room.Clients[client] = true
-			log.Printf("Client registered for document %s. Total clients: %d", client.DocID, len(room.Clients))
+			log.Printf("Client Registered for document %s. Total clients: %d", client.DocID, len(room.Clients))
 
-		case client := <-h.unregister:
-			room, ok := h.rooms[client.DocID]
+		case client := <-h.Unregister:
+			room, ok := h.Rooms[client.DocID]
 			if ok {
 				delete(room.Clients, client)
 				if len(room.Clients) == 0 {
-					delete(h.rooms, client.DocID)
+					delete(h.Rooms, client.DocID)
 					log.Printf("Room for document %s deleted (no clients)", client.DocID)
 				} else {
-					log.Printf("Client unregistered from document %s. Remaining clients: %d", client.DocID, len(room.Clients))
+					log.Printf("Client Unregistered from document %s. Remaining clients: %d", client.DocID, len(room.Clients))
 				}
 			}
 
-		case msg := <-h.broadcast:
-			room, ok := h.rooms[msg.DocumentID]
+		case msg := <-h.Broadcast:
+			room, ok := h.Rooms[msg.DocumentID]
 			if !ok {
 				continue
 			}
@@ -61,8 +61,8 @@ func (h *Hub) Run() {
 
 				err := client.Conn.WriteMessage(websocket.BinaryMessage, msg.Data)
 				if err != nil {
-					log.Printf("Error broadcasting to client in document %s: %v", msg.DocumentID, err)
-					h.unregister <- client
+					log.Printf("Error Broadcasting to client in document %s: %v", msg.DocumentID, err)
+					h.Unregister <- client
 				}
 			}
 		}

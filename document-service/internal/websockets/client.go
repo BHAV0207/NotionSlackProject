@@ -15,7 +15,7 @@ type Client struct {
 func (c *Client) ReadPump() {
 	defer func() {
 		log.Printf("Client disconnected from document: %s", c.DocID)
-		c.Hub.unregister <- c
+		c.Hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -31,7 +31,7 @@ func (c *Client) ReadPump() {
 		// Only process binary messages (Yjs updates)
 		if messageType == websocket.BinaryMessage {
 			// Broadcast CRDT update to others
-			c.Hub.broadcast <- Message{
+			c.Hub.Broadcast <- Message{
 				DocumentID: c.DocID,
 				Data:       data,
 				Sender:     c,
