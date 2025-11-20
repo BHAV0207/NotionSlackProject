@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/BHAV0207/documet-service/internal/handler"
+	"github.com/BHAV0207/documet-service/internal/repository"
 	"github.com/BHAV0207/documet-service/internal/websockets"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -20,9 +21,9 @@ func main() {
 	}
 
 	// 1) Initialize DB
-	db.Init() // this populates db.DB
+	repository.Init() // this populates db.DB
 	// get the gorm DB instance for handler
-	d := db.DB
+	d := repository.DB
 	if d == nil {
 		log.Fatal("database not initialized")
 	}
