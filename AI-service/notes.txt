@@ -1,0 +1,10 @@
+✅ Your Understanding (plus slight correction)
+You said:
+“it helps in simplifying manual tasks… it's like an agent that uses the LLM internally to do work for us.”
+That’s 90% correct — great intuition 🎯
+Here’s the improved version:
+
+✔️ LangChain is not exactly an agent,
+but it gives you the building blocks that agents use.
+Chains = automation
+Agents = intelligent decision-making using tools
