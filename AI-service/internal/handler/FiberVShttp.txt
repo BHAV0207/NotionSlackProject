@@ -1,0 +1,118 @@
+Great question — and you noticing this means you're paying attention to **how frameworks work** (which is *exactly* how backend dev maturity grows).
+
+Let’s break it down simply and in Study Mode style.
+
+---
+
+# ✅ **Why are we NOT using `http.ResponseWriter` and `*http.Request`?**
+
+Because…
+
+### 👉 **You’re using Fiber, not the default Go `net/http` package.**
+
+---
+
+# 🧠 Let’s Understand It Step-by-Step
+
+### **In Go’s standard net/http**
+
+A handler looks like:
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+    // write response using w
+    // read request using r
+}
+```
+
+This uses **Go’s default HTTP server**.
+
+---
+
+### **But Fiber is NOT the net/http framework**
+
+Fiber is built on top of **fasthttp**, a completely different HTTP engine.
+
+So instead of giving you:
+
+* `http.ResponseWriter`
+* `*http.Request`
+
+Fiber gives you **one single object:**
+
+```go
+func (h *AIHandler) Summarize(c *fiber.Ctx) error
+```
+
+### `c *fiber.Ctx` does EVERYTHING:
+
+* reading JSON body
+* reading headers
+* writing JSON
+* writing status codes
+* sending files
+* handling cookies
+* handling errors
+
+---
+
+# 📌 Example Comparison
+
+### **net/http style**
+
+```go
+func MyHandler(w http.ResponseWriter, r *http.Request) {
+    var body Req
+    json.NewDecoder(r.Body).Decode(&body)
+
+    json.NewEncoder(w).Encode(response)
+}
+```
+
+---
+
+### **Fiber style**
+
+```go
+func (h *AIHandler) Summarize(c *fiber.Ctx) error {
+    var body Req
+    c.BodyParser(&body)
+
+    return c.JSON(response)
+}
+```
+
+Cleaner — fewer steps — faster.
+
+---
+
+# 🧠 Why Fiber replaces ResponseWriter & Request?
+
+### ✔️ 1. Faster (fasthttp is the fastest Go HTTP engine)
+
+### ✔️ 2. Cleaner handler signatures
+
+### ✔️ 3. No need for separate request/response objects
+
+### ✔️ 4. Framework-level utilities (BodyParser, JSON, Params, etc.)
+
+### ✔️ 5. Unified context object (`*fiber.Ctx`)
+
+---
+
+# 📚 Small Analogy
+
+**net/http** = crude raw tools (strong but low-level)
+**Fiber** = advanced power tools (easier and faster)
+
+You don’t use `hammer + chisel` when a drill is available.
+
+---
+
+# 🧠 Study Mode Check
+
+Just confirm your understanding:
+
+### 👉 In one line, why don’t we use `http.ResponseWriter` inside Fiber handlers?
+
+Reply in your own words — then we continue to next part.
