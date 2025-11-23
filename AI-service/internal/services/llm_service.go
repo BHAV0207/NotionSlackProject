@@ -47,9 +47,16 @@ func NewLLMService() (*LLMService, error) {
 		ollamaModel = "llama3"
 	}
 
+	ollamaHost := os.Getenv("OLLAMA_HOST")
+	if ollamaHost == "" {
+		ollamaHost = "http://localhost:11434"
+	}
+
 	llm, err := ollama.New(
 		ollama.WithModel(ollamaModel),
+		ollama.WithServerURL(ollamaHost),
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to init Ollama LLM: %w", err)
 	}
@@ -73,6 +80,7 @@ func (s *LLMService) GenerateText(ctx context.Context, prompt string) (string, e
 	if s.llm == nil {
 		return "", fmt.Errorf("LLM not initialized")
 	}
+	
 
 	resp, err := s.llm.Call(ctx, prompt)
 	if err != nil {
@@ -106,26 +114,28 @@ func (s *LLMService) Chat(ctx context.Context, systemPrompt, userMessage string)
 	}
 
 	messages := []llms.MessageContent{
-		llms.TextParts(
-			llms.ChatMessageTypeSystem,
-			systemPrompt,
-		),
-		llms.TextParts(
-			llms.ChatMessageTypeHuman,
-			userMessage,
-		),
+		llms.TextParts(llms.ChatMessageTypeSystem, systemPrompt),
+		llms.TextParts(llms.ChatMessageTypeHuman, userMessage),
 	}
 
+	// GenerateContent returns *llms.ContentResponse
 	resp, err := s.llm.GenerateContent(ctx, messages)
 	if err != nil {
 		return "", fmt.Errorf("LLM chat failed: %w", err)
 	}
 
-	if len(resp) == 0 || len(resp[0].Parts) == 0 {
-		return "", fmt.Errorf("empty response from LLM")
+	if resp == nil || len(resp.Choices) == 0 {
+		return "", fmt.Errorf("LLM returned no choices")
 	}
 
-	return fmt.Sprint(resp[0].Parts[0]), nil
+	choice := resp.Choices[0]
+
+	if choice.FuncCall != nil {
+		return "", fmt.Errorf("model requested a function call, not plain text")
+	}
+
+	// The actual text content
+	return choice.Content, nil
 }
 
 func (s *LLMService) Suggest(ctx context.Context, contextText string) (string, error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/BHAV0207/AI-service/internal/services"
-	"github.com/gofiber/fiber"
+	"github.com/gofiber/fiber/v2"
 )
 
 type AIHandler struct {
@@ -14,6 +14,8 @@ type AIHandler struct {
 func NewAiHandler(llm *services.LLMService) *AIHandler {
 	return &AIHandler{LLM: llm}
 }
+
+//  in this cide we are not using the http framework we are using the fiber framework of the go lang so this might look different that the http one 
 
 func (h *AIHandler) Summarize(c *fiber.Ctx) error {
 	var body struct {
