@@ -16,6 +16,8 @@ type LLMService struct {
 	modelName string
 }
 
+
+
 func NewLLMService() (*LLMService, error) {
 	openAIKey := os.Getenv("OPENAI_API_KEY")
 
@@ -97,6 +99,7 @@ func (s *LLMService) Summarize(ctx context.Context, text string) (string, error)
 	Summarize the following content in a clear, concise way.
 	- Keep it under 5 bullet points.
 	- Preserve all key decisions and action items.
+	- it should not be more than 100 words.
 	
 	Content:
 	%s

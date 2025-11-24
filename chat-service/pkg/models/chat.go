@@ -12,4 +12,5 @@ type Message struct {
 	SenderID  string             `bson:"sender_id" json:"sender"`
 	Content   string             `bson:"content" json:"content"`
 	Timestamp time.Time          `bson:"timestamp" json:"timestamp"`
+	Type      string             `bson:"type" json:"type"`  // for the ai service and convinence 
 }
